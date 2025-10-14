@@ -12,10 +12,23 @@ class CompresorAudio:
         Comprime audio usando una técnica simple de compresión
         """
         try:
-            # Solo funciona con archivos WAV por simplicidad
-            if not archivo_audio.lower().endswith('.wav'):
-                raise ValueError("Solo se soportan archivos WAV para compresión")
+            # Para WAV - compresión real con reducción de calidad
+            if archivo_audio.lower().endswith('.wav'):
+                return self._comprimir_wav(archivo_audio)
             
+            # Para MP3 - no podemos comprimir MP3, entonces hacemos una "simulación"
+            elif archivo_audio.lower().endswith('.mp3'):
+                return self._simular_compresion_mp3(archivo_audio)
+            
+            else:
+                raise ValueError("Formato de audio no soportado. Use .wav o .mp3")
+            
+        except Exception as e:
+            raise Exception(f"Error en compresión de audio: {e}")
+    
+    def _comprimir_wav(self, archivo_audio):
+        """Comprime archivo WAV real reduciendo la calidad"""
+        try:
             with wave.open(archivo_audio, 'rb') as audio:
                 params = audio.getparams()
                 frames = audio.readframes(params.nframes)
@@ -23,44 +36,44 @@ class CompresorAudio:
             # Convertir frames a lista de muestras
             muestras = self._frames_a_muestras(frames, params.sampwidth)
             
-            # Aplicar compresión simple (reducción de resolución)
+            # Aplicar compresión reduciendo la resolución
             muestras_comprimidas = self._comprimir_muestras(muestras)
             
-            # Guardar audio comprimido
+            # Crear archivo WAV comprimido (REPRODUCIBLE)
             nombre_base = os.path.splitext(archivo_audio)[0]
-            archivo_salida = nombre_base + "_comprimido.awc"
+            archivo_salida = nombre_base + "_comprimido.wav"
             
-            # Guardar en formato binario limpio
-            self._guardar_comprimido(archivo_salida, muestras_comprimidas, params)
+            # Guardar como WAV reproducible
+            self._guardar_wav_comprimido(archivo_salida, muestras_comprimidas, params)
             
             return archivo_salida
             
         except Exception as e:
-            raise Exception(f"Error en compresión de audio: {e}")
+            raise Exception(f"Error comprimiendo WAV: {e}")
     
-    def descomprimir(self, archivo_comprimido):
-        """
-        Descomprime audio comprimido
-        """
+    def _simular_compresion_mp3(self, archivo_audio):
+        """Simula compresión MP3 (no podemos comprimir MP3 realmente)"""
         try:
-            # Cargar datos comprimidos
-            muestras_comprimidas, params = self._cargar_comprimido(archivo_comprimido)
+            nombre_base = os.path.splitext(archivo_audio)[0]
+            archivo_salida = nombre_base + "_info_compresion.txt"
             
-            # Convertir muestras a frames
-            frames = self._muestras_a_frames(muestras_comprimidas, params.sampwidth)
+            # Crear archivo de información sobre la compresión
+            tamano_original = obtener_tamano_archivo(archivo_audio)
             
-            # Guardar audio descomprimido
-            nombre_base = os.path.splitext(archivo_comprimido)[0]
-            archivo_salida = nombre_base + "_reconstruido.wav"
-            
-            with wave.open(archivo_salida, 'wb') as audio:
-                audio.setparams(params)
-                audio.writeframes(frames)
+            with open(archivo_salida, 'w', encoding='utf-8') as f:
+                f.write("INFORMACIÓN DE COMPRESIÓN DE AUDIO MP3\n")
+                f.write("=" * 50 + "\n")
+                f.write(f"Archivo original: {os.path.basename(archivo_audio)}\n")
+                f.write(f"Tamaño original: {formatear_tamano(tamano_original)}\n")
+                f.write(f"Formato: MP3\n")
+                f.write("\nNOTA: Los archivos MP3 ya están comprimidos.\n")
+                f.write("Esta es una simulación de compresión.\n")
+                f.write("El archivo MP3 original se mantiene intacto.\n")
             
             return archivo_salida
             
         except Exception as e:
-            raise Exception(f"Error en descompresión de audio: {e}")
+            raise Exception(f"Error en simulación MP3: {e}")
     
     def _frames_a_muestras(self, frames, sampwidth):
         """Convierte frames de audio a lista de muestras"""
@@ -103,52 +116,45 @@ class CompresorAudio:
         
         return frames
     
-    def _comprimir_muestras(self, muestras, factor=4):
-        """Comprime muestras reduciendo la resolución"""
+    def _comprimir_muestras(self, muestras, factor=2):
+        """Comprime muestras reduciendo la resolución (pérdida de calidad)"""
         return [muestra // factor * factor for muestra in muestras]
     
-    def _guardar_comprimido(self, archivo_salida, muestras_comprimidas, params):
+    def _guardar_wav_comprimido(self, archivo_salida, muestras_comprimidas, params_original):
         """
-        Guarda muestras comprimidas en formato binario limpio
+        Guarda las muestras comprimidas como un archivo WAV reproducible
         """
-        with open(archivo_salida, 'wb') as archivo:
-            # Guardar parámetros del audio
-            archivo.write(params.nchannels.to_bytes(2, byteorder='big'))
-            archivo.write(params.sampwidth.to_bytes(2, byteorder='big'))
-            archivo.write(params.framerate.to_bytes(4, byteorder='big'))
-            archivo.write(params.nframes.to_bytes(4, byteorder='big'))
-            archivo.write(params.comptype.encode('utf-8'))
-            archivo.write(params.compname.encode('utf-8'))
-            
-            # Guardar cantidad de muestras
-            archivo.write(len(muestras_comprimidas).to_bytes(4, byteorder='big'))
-            
-            # Guardar muestras
-            for muestra in muestras_comprimidas:
-                archivo.write(muestra.to_bytes(4, byteorder='big', signed=True))
+        # Convertir muestras a frames
+        frames_comprimidos = self._muestras_a_frames(muestras_comprimidas, params_original.sampwidth)
+        
+        # Crear nuevo archivo WAV
+        with wave.open(archivo_salida, 'wb') as audio:
+            # Usar los mismos parámetros pero ajustar nframes
+            audio.setnchannels(params_original.nchannels)
+            audio.setsampwidth(params_original.sampwidth)
+            audio.setframerate(params_original.framerate)
+            audio.setnframes(len(muestras_comprimidas) // params_original.nchannels)
+            audio.writeframes(frames_comprimidos)
+
+# Necesitamos importar estas funciones desde utilidades
+def obtener_tamano_archivo(ruta_archivo):
+    """Obtiene el tamaño de un archivo en bytes"""
+    try:
+        return os.path.getsize(ruta_archivo)
+    except OSError:
+        return 0
+
+def formatear_tamano(tamano_bytes):
+    """Formatea el tamaño en bytes a una representación legible"""
+    if tamano_bytes == 0:
+        return "0 B"
     
-    def _cargar_comprimido(self, archivo_comprimido):
-        """
-        Carga muestras comprimidas desde archivo binario
-        """
-        with open(archivo_comprimido, 'rb') as archivo:
-            # Leer parámetros
-            nchannels = int.from_bytes(archivo.read(2), byteorder='big')
-            sampwidth = int.from_bytes(archivo.read(2), byteorder='big')
-            framerate = int.from_bytes(archivo.read(4), byteorder='big')
-            nframes = int.from_bytes(archivo.read(4), byteorder='big')
-            comptype = archivo.read(4).decode('utf-8')
-            compname = archivo.read(4).decode('utf-8')
-            
-            params = wave._wave_params(nchannels, sampwidth, framerate, nframes, comptype, compname)
-            
-            # Leer cantidad de muestras
-            num_muestras = int.from_bytes(archivo.read(4), byteorder='big')
-            
-            # Leer muestras
-            muestras_comprimidas = []
-            for _ in range(num_muestras):
-                muestra = int.from_bytes(archivo.read(4), byteorder='big', signed=True)
-                muestras_comprimidas.append(muestra)
-            
-            return muestras_comprimidas, params
+    unidades = ['B', 'KB', 'MB', 'GB']
+    tamano = float(tamano_bytes)
+    
+    for unidad in unidades:
+        if tamano < 1024.0 or unidad == unidades[-1]:
+            return f"{tamano:.2f} {unidad}"
+        tamano /= 1024.0
+    
+    return f"{tamano_bytes} B"
