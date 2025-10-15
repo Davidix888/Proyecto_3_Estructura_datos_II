@@ -1,4 +1,3 @@
-# interfaz_grafica.py
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import os
@@ -319,80 +318,132 @@ class VentanaCompresionTexto(VentanaCompresionBase):
             messagebox.showerror("Error", f"❌ No se pudo comprimir el archivo: {e}")
             self.label_resultados.config(text="❌ Error en la compresión")
 
+
 class VentanaCompresionImagenes(VentanaCompresionBase):
     def __init__(self, parent, compresor):
         super().__init__(parent, compresor, "Compresión de Imágenes", "🖼️")
-        
+
     def configurar_interfaz(self):
         main_frame = tk.Frame(self.ventana, bg='#ecf0f1', padx=30, pady=20)
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         # Header
         header_frame = tk.Frame(main_frame, bg='#9b59b6', relief='raised', bd=2)
         header_frame.pack(fill=tk.X, pady=(0, 20))
-        
+
         titulo = tk.Label(header_frame,
-                         text="🖼️ Compresión de Imágenes - Algoritmo RLE",
-                         font=('Arial', 14, 'bold'),
-                         bg='#9b59b6',
-                         fg='white',
-                         pady=10)
+                          text="🖼️ Compresión de Imágenes - Algoritmo RLE",
+                          font=('Arial', 14, 'bold'),
+                          bg='#9b59b6',
+                          fg='white',
+                          pady=10)
         titulo.pack()
-        
+
         # Frame de contenido
         content_frame = tk.Frame(main_frame, bg='white', relief='sunken', bd=1, padx=20, pady=20)
         content_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         # Botón seleccionar archivo
         boton_seleccionar = ttk.Button(content_frame,
-                                      text="🖼️ Seleccionar Imagen",
-                                      command=lambda: self.seleccionar_archivo([
-                                          ("Imágenes PNG", "*.png"),
-                                          ("Imágenes BMP", "*.bmp")
-                                      ], "Seleccionar imagen para comprimir"),
-                                      style='Moderno.TButton')
+                                       text="🖼️ Seleccionar Imagen",
+                                       command=lambda: self.seleccionar_archivo([
+                                           ("Imágenes PNG", "*.png"),
+                                           ("Imágenes BMP", "*.bmp")
+                                       ], "Seleccionar imagen para comprimir"),
+                                       style='Moderno.TButton')
         boton_seleccionar.pack(pady=15)
-        
+
         # Información del archivo
         info_frame = tk.Frame(content_frame, bg='#f8f9fa', relief='ridge', bd=1, padx=10, pady=10)
         info_frame.pack(fill=tk.X, pady=10)
-        
+
         self.label_archivo = tk.Label(info_frame, text="🖼️ No se ha seleccionado archivo", bg='#f8f9fa')
         self.label_archivo.pack(pady=5)
-        
+
         self.label_tamano_original = tk.Label(info_frame, text="📊 Tamaño original: --", bg='#f8f9fa')
         self.label_tamano_original.pack(pady=5)
-        
+
         # Botón comprimir (inicialmente deshabilitado)
         self.boton_comprimir = ttk.Button(content_frame,
-                                         text="🗜️ Comprimir a .rle",
-                                         command=self.comprimir,
-                                         style='Moderno.TButton',
-                                         state='disabled')
-        self.boton_comprimir.pack(pady=20)
-        
+                                          text="🗜️ Comprimir a .rle",
+                                          command=self.comprimir,
+                                          style='Moderno.TButton',
+                                          state='disabled')
+        self.boton_comprimir.pack(pady=10)
+
+        # Botón descomprimir (.rle)
+        self.boton_descomprimir = ttk.Button(content_frame,
+                                             text="🔓 Descomprimir .rle",
+                                             command=self.descomprimir,
+                                             style='Moderno.TButton')
+        self.boton_descomprimir.pack(pady=10)
+
+        # Botón visualizar reconstruida
+        self.boton_visualizar = ttk.Button(content_frame,
+                                           text="👁️ Visualizar imagen reconstruida",
+                                           command=self.visualizar_imagen,
+                                           style='Moderno.TButton')
+        self.boton_visualizar.pack(pady=10)
+
         # Resultados
         self.label_resultados = tk.Label(content_frame, text="", bg='white', justify=tk.LEFT, wraplength=400)
         self.label_resultados.pack(pady=10, fill=tk.BOTH, expand=True)
-        
+
     def comprimir(self):
         if not self.archivo_original:
             messagebox.showwarning("Advertencia", "⚠️ Por favor seleccione una imagen primero")
             return
-            
+
         try:
             self.label_resultados.config(text="⏳ Comprimiendo imagen... Por favor espere.")
             self.ventana.update()
-            
+
             archivo_comprimido = self.compresor.comprimir(self.archivo_original)
             tamano_original = obtener_tamano_archivo(self.archivo_original)
             tamano_comprimido = obtener_tamano_archivo(archivo_comprimido)
-            
+
             self.mostrar_resultados(tamano_original, tamano_comprimido, archivo_comprimido)
-            
+
         except Exception as e:
             messagebox.showerror("Error", f"❌ No se pudo comprimir la imagen: {e}")
             self.label_resultados.config(text="❌ Error en la compresión")
+
+    # -------------------- NUEVOS MÉTODOS --------------------
+    def descomprimir(self):
+        """Permite seleccionar un .rle y reconstruir la imagen."""
+        archivo = filedialog.askopenfilename(
+            title="Seleccionar archivo .rle para descomprimir",
+            filetypes=[("Archivo RLE", "*.rle")]
+        )
+        if not archivo:
+            return
+
+        try:
+            self.label_resultados.config(text="⏳ Descomprimiendo imagen... Por favor espere.")
+            self.ventana.update()
+
+            archivo_reconstruido = self.compresor.descomprimir(archivo)
+            # Actualizamos ultima salida y mostramos info
+            self.label_resultados.config(text=f"✅ Imagen reconstruida: {os.path.basename(archivo_reconstruido)}")
+            messagebox.showinfo("Éxito", f"🎉 Imagen reconstruida:\n{archivo_reconstruido}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"❌ No se pudo descomprimir la imagen: {e}")
+            self.label_resultados.config(text="❌ Error en la descompresión")
+
+    def visualizar_imagen(self):
+        """Abre la última imagen reconstruida en el visor del sistema."""
+        try:
+            from PIL import Image
+            ruta = getattr(self.compresor, "ultima_salida", None)
+            if ruta and os.path.exists(ruta):
+                Image.open(ruta).show()
+            else:
+                messagebox.showwarning("Atención",
+                                       "⚠️ No hay imagen disponible para visualizar. Puedes descomprimir primero.")
+        except Exception as e:
+            messagebox.showerror("Error", f"❌ No se pudo abrir la imagen: {e}")
+
 
 class VentanaCompresionAudio(VentanaCompresionBase):
     def __init__(self, parent, compresor):
